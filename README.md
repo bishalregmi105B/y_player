@@ -42,7 +42,7 @@ First, ensure that you initialize the YPlayer in your `main.dart`:
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:y_player/y_player_main.dart';
+import 'package:y_player_alpha/y_player_main.dart';
 
 void main() {
   YPlayerInitializer.ensureInitialized();
@@ -54,7 +54,7 @@ Here's a simple example of how to use YPlayer in your Flutter app:
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:y_player/y_player_main.dart';
+import 'package:y_player_alpha/y_player_main.dart';
 
 class MyVideoPlayer extends StatelessWidget {
   @override

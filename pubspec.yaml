@@ -1,8 +1,8 @@
-name: y_player
+name: y_player_alpha
 description: "YPlayer is a Flutter package that provides an easy-to-use YouTube
   video player widget"
 version: 2.0.6
-repository: https://github.com/ijashuzain/y_player
+repository: https://github.com/bishalregmi105B/y_player
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -14,8 +14,7 @@ dependencies:
   media_kit: ^1.2.0
   media_kit_libs_video: ^1.0.6
   media_kit_video: ^1.3.0
-  youtube_explode_dart:
-    path: ./custom/youtube_explode_dart
+  youtube_explode_dart_alpha: ^2.5.3
 
 dev_dependencies:
   flutter_lints: ^5.0.0

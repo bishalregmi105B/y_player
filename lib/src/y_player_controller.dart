@@ -3,8 +3,8 @@ import 'dart:math'; // For min/max
 
 import 'package:flutter/foundation.dart'; // For kReleaseMode
 import 'package:media_kit/media_kit.dart';
-import 'package:y_player/y_player.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart' as exp;
+import 'package:y_player_alpha/y_player.dart';
+import 'package:youtube_explode_dart_alpha/youtube_explode_dart_alpha.dart' as exp;
 import 'y_player_initializer.dart';
 
 /// Controller for managing the YouTube player.

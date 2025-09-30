@@ -11,7 +11,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  y_player:
+  y_player_alpha:
     path: ../
 
 dev_dependencies:

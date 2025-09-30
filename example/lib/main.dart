@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:y_player/y_player.dart';
+import 'package:y_player_alpha/y_player_alpha.dart';
 
 void main() {
   YPlayerInitializer.ensureInitialized();
