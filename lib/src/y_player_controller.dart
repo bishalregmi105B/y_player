@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart'; // For kReleaseMode
 import 'package:media_kit/media_kit.dart';
 import 'package:y_player/y_player.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as exp;
+import 'y_player_initializer.dart';
 
 /// Controller for managing the YouTube player.
 ///
@@ -62,6 +63,8 @@ class YPlayerController {
   /// Constructs a YPlayerController with optional callback functions.
   YPlayerController({this.onStateChanged, this.onProgressChanged})
       : statusNotifier = ValueNotifier<YPlayerStatus>(YPlayerStatus.loading) {
+    // Ensure MediaKit is initialized before creating Player
+    YPlayerInitializer.ensureInitialized();
     _player = Player();
     _setupPlayerListeners();
   }
@@ -256,13 +259,32 @@ class YPlayerController {
         // Move to most recently used
         _manifestCacheOrder.remove(videoId);
         _manifestCacheOrder.add(videoId);
+        print('YPlayerController: Using cached manifest for $videoId');
       } else {
-        // Use iOS client to get better audio track metadata
-        manifest = await _yt.videos.streamsClient.getManifest(
-          video.id,
-          ytClients: [exp.YoutubeApiClient.ios, exp.YoutubeApiClient.tv],
-        );
-        _cacheManifest(videoId, manifest);
+        // Use AndroidVr as primary (like working download examples), Android as fallback
+        print('YPlayerController: Attempting with androidVr client (primary)...');
+        try {
+          manifest = await _yt.videos.streamsClient.getManifest(
+            video.id,
+            ytClients: [exp.YoutubeApiClient.androidVr, exp.YoutubeApiClient.android],
+          );
+          print('YPlayerController: ✓ SUCCESS with androidVr client!');
+          print('YPlayerController: ✓ Total streams: ${manifest.streams.length}');
+          print('YPlayerController: ✓ Video-only streams: ${manifest.videoOnly.length}');
+          print('YPlayerController: ✓ Audio-only streams: ${manifest.audioOnly.length}');
+          print('YPlayerController: ✓ Muxed streams: ${manifest.muxed.length}');
+          _cacheManifest(videoId, manifest);
+        } catch (e) {
+          print('YPlayerController: AndroidVr client failed: $e');
+          print('YPlayerController: Trying fallback with android only...');
+          // Fallback to android only
+          manifest = await _yt.videos.streamsClient.getManifest(
+            video.id,
+            ytClients: [exp.YoutubeApiClient.android],
+          );
+          print('YPlayerController: ✓ SUCCESS with android fallback!');
+          _cacheManifest(videoId, manifest);
+        }
       }
 
       // Store manifest and video ID for quality changes later
@@ -285,89 +307,140 @@ class YPlayerController {
       }
       // -----------------------------------------------------
 
-      // Get the appropriate video stream based on quality setting
-      exp.VideoStreamInfo videoStreamInfo;
-      if (_currentQuality == 0) {
-        // Auto - highest quality
-        videoStreamInfo = manifest.videoOnly.withHighestBitrate();
-      } else {
-        // Try to find the selected quality, fallback to highest if not available
+      // Try muxed streams first (simpler and more reliable)
+      bool usedMuxedStream = false;
+      if (manifest.muxed.isNotEmpty) {
+        print('YPlayerController: Using muxed stream (video+audio combined)');
+        final muxedStream = manifest.muxed.withHighestBitrate();
+        
+        if (!kReleaseMode) {
+          debugPrint('YPlayerController: Muxed stream URL: ${muxedStream.url}');
+          debugPrint('YPlayerController: Muxed quality: ${muxedStream.videoResolution.height}p');
+          debugPrint('YPlayerController: Muxed bitrate: ${muxedStream.bitrate}');
+        }
+
+        // Stop any existing playback
+        if (isInitialized) {
+          debugPrint('YPlayerController: Stopping previous playback');
+          await _player.stop();
+        }
+
+        // Open the muxed stream (contains both video and audio)
         try {
-          videoStreamInfo = manifest.videoOnly
-              .where((s) => s.videoResolution.height == _currentQuality)
-              .withHighestBitrate();
+          await _player.open(Media(muxedStream.url.toString()), play: false);
+          print('YPlayerController: ✓ Muxed stream loaded successfully');
+          usedMuxedStream = true;
         } catch (e) {
-          debugPrint(
-              'YPlayerController: Selected quality not available, using highest');
-          videoStreamInfo = manifest.videoOnly.withHighestBitrate();
+          print('YPlayerController: ✗ Muxed stream failed: $e');
+          print('YPlayerController: Falling back to separate video+audio streams...');
         }
       }
-
-      // Select audio stream based on forceOriginalAudio setting
-      exp.AudioStreamInfo audioStreamInfo;
       
-      if (_forceOriginalAudio) {
-        // Try to find the original audio track
-        try {
-          // First, try to find track with "original" in display name
-          audioStreamInfo = manifest.audioOnly.firstWhere((stream) {
-            if (stream.audioTrack != null) {
-              try {
-                dynamic track = stream.audioTrack;
-                String displayName = track.displayName?.toString() ?? '';
-                return displayName.toLowerCase().contains('original');
-              } catch (e) {
-                // Fallback to toString() method
-                final trackString = stream.audioTrack.toString().toLowerCase();
-                return trackString.contains('original');
-              }
-            }
-            return false;
-          });
-        } catch (e) {
+      if (!usedMuxedStream) {
+        if (manifest.muxed.isEmpty) {
+          print('YPlayerController: No muxed streams available, using separate video+audio');
+        } else {
+          print('YPlayerController: Muxed streams failed, trying separate video+audio');
+        }
+        
+        // Fallback to separate video and audio streams
+        exp.VideoStreamInfo videoStreamInfo;
+        if (_currentQuality == 0) {
+          // Auto - highest quality
+          videoStreamInfo = manifest.videoOnly.withHighestBitrate();
+        } else {
+          // Try to find the selected quality, fallback to highest if not available
           try {
-            // If no "original" track found, try to find non-default track
-            // (original tracks are often not the default)
+            videoStreamInfo = manifest.videoOnly
+                .where((s) => s.videoResolution.height == _currentQuality)
+                .withHighestBitrate();
+          } catch (e) {
+            debugPrint(
+                'YPlayerController: Selected quality not available, using highest');
+            videoStreamInfo = manifest.videoOnly.withHighestBitrate();
+          }
+        }
+
+        // Select audio stream based on forceOriginalAudio setting
+        exp.AudioStreamInfo audioStreamInfo;
+        
+        if (_forceOriginalAudio) {
+          // Try to find the original audio track
+          try {
+            // First, try to find track with "original" in display name
             audioStreamInfo = manifest.audioOnly.firstWhere((stream) {
               if (stream.audioTrack != null) {
                 try {
                   dynamic track = stream.audioTrack;
-                  return track.audioIsDefault == false;
+                  String displayName = track.displayName?.toString() ?? '';
+                  return displayName.toLowerCase().contains('original');
                 } catch (e) {
-                  return false;
+                  // Fallback to toString() method
+                  final trackString = stream.audioTrack.toString().toLowerCase();
+                  return trackString.contains('original');
                 }
               }
               return false;
             });
           } catch (e) {
-            // If all else fails, use the first track
-            audioStreamInfo = manifest.audioOnly.first;
+            try {
+              // If no "original" track found, try to find non-default track
+              // (original tracks are often not the default)
+              audioStreamInfo = manifest.audioOnly.firstWhere((stream) {
+                if (stream.audioTrack != null) {
+                  try {
+                    dynamic track = stream.audioTrack;
+                    return track.audioIsDefault == false;
+                  } catch (e) {
+                    return false;
+                  }
+                }
+                return false;
+              });
+            } catch (e) {
+              // If all else fails, use the first track
+              audioStreamInfo = manifest.audioOnly.first;
+            }
           }
+        } else {
+          // Default behavior - use highest bitrate
+          audioStreamInfo = manifest.audioOnly.withHighestBitrate();
         }
-      } else {
-        // Default behavior - use highest bitrate
-        audioStreamInfo = manifest.audioOnly.withHighestBitrate();
+
+        if (!kReleaseMode) {
+          debugPrint('YPlayerController: Video URL: ${videoStreamInfo.url}');
+          debugPrint('YPlayerController: Audio URL: ${audioStreamInfo.url}');
+          debugPrint(
+              'YPlayerController: Selected quality: ${videoStreamInfo.videoResolution.height}p');
+        }
+
+        // Stop any existing playback
+        if (isInitialized) {
+          debugPrint('YPlayerController: Stopping previous playback');
+          await _player.stop();
+        }
+
+        // Open the video stream
+        try {
+          await _player.open(Media(videoStreamInfo.url.toString()), play: false);
+          print('YPlayerController: ✓ Video stream loaded');
+        } catch (e) {
+          print('YPlayerController: ✗ Failed to load video stream: $e');
+          throw e;
+        }
+
+        // Add the audio track
+        try {
+          await _player
+              .setAudioTrack(AudioTrack.uri(audioStreamInfo.url.toString()));
+          print('YPlayerController: ✓ Audio track loaded');
+        } catch (e) {
+          print('YPlayerController: ✗ Failed to load audio track: $e');
+          throw e;
+        }
+        
+        print('YPlayerController: ✓ Separate video+audio streams loaded');
       }
-
-      if (!kReleaseMode) {
-        debugPrint('YPlayerController: Video URL: ${videoStreamInfo.url}');
-        debugPrint('YPlayerController: Audio URL: ${audioStreamInfo.url}');
-        debugPrint(
-            'YPlayerController: Selected quality: ${videoStreamInfo.videoResolution.height}p');
-      }
-
-      // Stop any existing playback
-      if (isInitialized) {
-        debugPrint('YPlayerController: Stopping previous playback');
-        await _player.stop();
-      }
-
-      // Open the video stream
-      await _player.open(Media(videoStreamInfo.url.toString()), play: false);
-
-      // Add the audio track
-      await _player
-          .setAudioTrack(AudioTrack.uri(audioStreamInfo.url.toString()));
 
       // Add a small delay to ensure everything is set up
       await Future.delayed(const Duration(milliseconds: 200));
