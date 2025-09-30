@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:y_player_alpha/src/quality_selection_sheet.dart';
 import 'package:y_player_alpha/src/speed_slider_sheet.dart';
-import 'package:y_player_alpha/y_player.dart';
+import 'package:y_player_alpha/y_player_alpha.dart';
 
 /// A customizable YouTube video player widget.
 ///

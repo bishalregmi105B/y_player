@@ -3,7 +3,7 @@ import 'dart:math'; // For min/max
 
 import 'package:flutter/foundation.dart'; // For kReleaseMode
 import 'package:media_kit/media_kit.dart';
-import 'package:y_player_alpha/y_player.dart';
+import 'package:y_player_alpha/y_player_alpha.dart';
 import 'package:youtube_explode_dart_alpha/youtube_explode_dart_alpha.dart' as exp;
 import 'y_player_initializer.dart';
 
