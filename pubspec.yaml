@@ -24,5 +24,5 @@ dev_dependencies:
 # These are YouTube's public API keys used for accessing YouTube's internal API
 # They are not private secrets and are commonly found in YouTube's web client
 false_secrets:
-  - AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8
-  - AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc
+  - /custom/youtube_explode_dart/deep_client_research.dart
+  - /custom/youtube_explode_dart/lib/src/reverse_engineering/youtube_http_client.dart
