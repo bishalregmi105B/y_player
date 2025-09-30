@@ -20,3 +20,9 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
+
+# These are YouTube's public API keys used for accessing YouTube's internal API
+# They are not private secrets and are commonly found in YouTube's web client
+false_secrets:
+  - AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8
+  - AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc
